@@ -43,9 +43,6 @@ object customUjsonTest extends TestSuite {
           )
         }
       }
-      test("exceptions") {
-
-      }
     }
     test("deserialize") {
       def assertCorrectDeser(s: String, v: BooleanExpression): Unit = {
@@ -77,6 +74,19 @@ object customUjsonTest extends TestSuite {
             """{"and":{"e1":false,"e2":true}}""",
             And(False, True)
           )
+        }
+        test("Incorrect JSON value triggers an exception - basic JSON value") {
+          val incorrectJSONValue = "null"
+          val e = intercept[BooleanExpression.IncorrectJSONValue](
+            upickle.default.read[BooleanExpression](incorrectJSONValue))
+          assert(e.json == incorrectJSONValue)
+        }
+        test("Incorrect JSON value triggers an exception - composite JSON value") {
+          val incorrectJSONValue = """{"e1":true}"""
+          val json = s"""{"and":$incorrectJSONValue}"""
+          val e = intercept[BooleanExpression.IncorrectJSONValue](
+            upickle.default.read[BooleanExpression](json))
+          assert(e.json == incorrectJSONValue)
         }
       }
       test("various cases") {

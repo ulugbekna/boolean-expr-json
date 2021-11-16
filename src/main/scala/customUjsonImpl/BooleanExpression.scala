@@ -6,6 +6,10 @@ import upickle.default.{ReadWriter => RW}
 sealed trait BooleanExpression
 
 object BooleanExpression {
+  /* Exception raised for a JSON (sub-)value, which is not expected,
+  * i.e., does not come in the same shape used to serialize a `BooleanExpression` */
+  case class IncorrectJSONValue(json: String) extends Exception
+
   implicit val rw: RW[BooleanExpression] = {
     def toJson(expr: BooleanExpression): ujson.Value =
       expr match {
@@ -27,6 +31,13 @@ object BooleanExpression {
       }
 
     def fromJson(json: ujson.Value): BooleanExpression = {
+      def parseAndOrSubexpr(v: Value) = {
+        val vmap = v.obj
+        if (!(vmap.contains("e1") && vmap.contains("e2")))
+          throw IncorrectJSONValue(v.toString())
+        (fromJson(vmap("e1")), fromJson(vmap("e2")))
+      }
+
       json match {
         case Str(s) => Variable(s)
         case bool: Bool => if (bool.bool) True else False
@@ -34,17 +45,15 @@ object BooleanExpression {
           map.head match {
             case ("not", e) => Not(fromJson(e))
             case ("and", v) =>
-              val vmap = v.obj
-              assert(vmap.contains("e1") && vmap.contains("e2"))
-              And(fromJson(vmap("e1")), fromJson(vmap("e2")))
+              val (e1, e2) = parseAndOrSubexpr(v)
+              And(e1, e2)
             case ("or", v) =>
-              val vmap = v.obj
-              assert(vmap.contains("e1") && vmap.contains("e2"))
-              Or(fromJson(vmap("e1")), fromJson(vmap("e2")))
+              val (e1, e2) = parseAndOrSubexpr(v)
+              Or(e1, e2)
           }
         case v@(Num(_)
                 | Null
-                | Arr(_)) => throw new Exception(s"unexpected json value $v")
+                | Arr(_)) => throw IncorrectJSONValue(v.toString())
       }
     }
 
